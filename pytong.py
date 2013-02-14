@@ -19,6 +19,7 @@ ID_ABOUT = wx.NewId()
 ID_START = wx.NewId()
 ID_STOP  = wx.NewId()
 ID_CLEAR  = wx.NewId()
+ID_ENABLE_DBG = wx.NewId()
 ID_TB = wx.NewId() # Toolbar on/off
 
 RunDepth = 0
@@ -26,11 +27,14 @@ ShouldStop = False
 
 options = None # Command line options
 filename = "" # startup file
+enabled_dbg = False
+dbg_client = None
 
 prgpath = os.path.split(__file__)[0]
 ICON_OK = os.path.join(prgpath, "icons/circle_green.png")
 ICON_NOK = os.path.join(prgpath, "icons/circle_red.png")
 ICON_DEFAULT = os.path.join(prgpath, "icons/circle_gray.png")
+ICON_ENABLE_DBG = os.path.join(prgpath, 'icons/enable_dbg.png')
 
 TestResultEvent, EVT_TESTRESULT = wx.lib.newevent.NewEvent()
 StopEvent,       EVT_STOP       = wx.lib.newevent.NewEvent()
@@ -38,10 +42,14 @@ ItemTextEvent,   EVT_ITEMTEXT   = wx.lib.newevent.NewEvent()
 AppendConsoleEvent, EVT_CONSOLE = wx.lib.newevent.NewEvent()
 
 def dbgp_connect():
+	if not enabled_dbg: return
 	import dbgp.client
+	global dbg_client
+	if dbg_client: return
 	idekey = os.environ.get('USER', os.environ.get('USERNAME', ''))
-	cl = dbgp.client.backendCmd(idekey, None, [], dbgp.client.h_main())
-	cl.connect('localhost')
+	dbg_client = dbgp.client.backendCmd(idekey, None, [], dbgp.client.h_main())
+	dbg_client.connect('localhost')
+	dbg_client.breakNow()
 
 def RunTest(frame, item):
 	"""Recursively run tests from tree item."""
@@ -67,7 +75,7 @@ def RunTest(frame, item):
 		data = frame.tree.GetPyData(item)
 		result = unittest.TestResult()
 		wx.PostEvent(frame, ItemTextEvent(item=item, running = True))
-		#dbgp_connect()
+		dbgp_connect()
 		data.run(result)
 		wx.PostEvent(frame, ItemTextEvent(item=item, running = False))
 		success = result.wasSuccessful()
@@ -123,6 +131,7 @@ class Frame(wx.Frame):
 		tb.AddTool(ID_START, wx.Bitmap(ICON_OK))
 		tb.AddTool(ID_STOP, wx.Bitmap(ICON_NOK))
 		tb.AddTool(ID_CLEAR, wx.Bitmap(ICON_DEFAULT))
+		tb.AddCheckTool(ID_ENABLE_DBG, wx.Bitmap(ICON_ENABLE_DBG))
 		self.tb = tb
 		tb.Realize()
 
@@ -155,6 +164,7 @@ class Frame(wx.Frame):
 		self.Bind(wx.EVT_TOOL, self.OnStart, id = ID_START)
 		self.Bind(wx.EVT_TOOL, self.OnStopRequest,  id = ID_STOP)
 		self.Bind(wx.EVT_TOOL, self.OnClear,  id = ID_CLEAR)
+		self.Bind(wx.EVT_TOOL, self.OnEnableDbgToggle, id = ID_ENABLE_DBG)
 
 		self.Bind(EVT_TESTRESULT, self.OnTestResult)
 		self.Bind(EVT_STOP, self.OnStop)
@@ -231,6 +241,10 @@ class Frame(wx.Frame):
 		self.textCtrl.Clear()
 		if filename:
 			self.Load()
+
+	def OnEnableDbgToggle(self, event):
+		global enabled_dbg
+		enabled_dbg = not enabled_dbg
 	
 	def Load(self):
 		""" Loads the test class in filename. """
