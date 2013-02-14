@@ -27,14 +27,21 @@ ShouldStop = False
 options = None # Command line options
 filename = "" # startup file
 
-ICON_OK = "icons/circle_green.png"
-ICON_NOK = "icons/circle_red.png"
-ICON_DEFAULT = "icons/circle_gray.png"
+prgpath = os.path.split(__file__)[0]
+ICON_OK = os.path.join(prgpath, "icons/circle_green.png")
+ICON_NOK = os.path.join(prgpath, "icons/circle_red.png")
+ICON_DEFAULT = os.path.join(prgpath, "icons/circle_gray.png")
 
 TestResultEvent, EVT_TESTRESULT = wx.lib.newevent.NewEvent()
 StopEvent,       EVT_STOP       = wx.lib.newevent.NewEvent()
 ItemTextEvent,   EVT_ITEMTEXT   = wx.lib.newevent.NewEvent()
 AppendConsoleEvent, EVT_CONSOLE = wx.lib.newevent.NewEvent()
+
+def dbgp_connect():
+	import dbgp.client
+	idekey = os.environ.get('USER', os.environ.get('USERNAME', ''))
+	cl = dbgp.client.backendCmd(idekey, None, [], dbgp.client.h_main())
+	cl.connect('localhost')
 
 def RunTest(frame, item):
 	"""Recursively run tests from tree item."""
@@ -60,6 +67,7 @@ def RunTest(frame, item):
 		data = frame.tree.GetPyData(item)
 		result = unittest.TestResult()
 		wx.PostEvent(frame, ItemTextEvent(item=item, running = True))
+		#dbgp_connect()
 		data.run(result)
 		wx.PostEvent(frame, ItemTextEvent(item=item, running = False))
 		success = result.wasSuccessful()
@@ -86,7 +94,7 @@ class Frame(wx.Frame):
 		wx.Frame.__init__(self, None, wx.ID_ANY, title, size=(480, 480))
 		self.CreateStatusBar(1, 0, 0, "")
 
-		self.SetIcon(wx.Icon("icons/icon32x16b.xpm", wx.BITMAP_TYPE_XPM))
+		self.SetIcon(wx.Icon(os.path.join(prgpath, "icons/icon32x16b.xpm"), wx.BITMAP_TYPE_XPM))
 
 		menu = wx.Menu()
 		menu.Append(ID_LOAD, "&Load...\tCtrl+L")
@@ -153,8 +161,8 @@ class Frame(wx.Frame):
 		self.Bind(EVT_ITEMTEXT, self.OnItemText)
 		self.Bind(EVT_CONSOLE, self.OnConsole)
 
+		self.Load()
 		if options.run:
-			self.Load()
 			self.OnStart()
 
 	def OnTB(self, event):
@@ -178,6 +186,7 @@ class Frame(wx.Frame):
 
 	def OnConsole(self, event):
 		"""Add text to the console area. """
+		print event.text
 		self.textCtrl.AppendText(event.text)
 
 	def OnExit(self, event):
